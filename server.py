@@ -6,8 +6,10 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
+import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -24,6 +26,36 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 WORD_RE = re.compile(r"^[a-z]{2,12}$")
 SAY_SAFE = re.compile(r"[^A-Za-z0-9 .,!?'\-]")
 ESPEAK = shutil.which("espeak-ng") or shutil.which("espeak")
+BODY_LIMIT = 65536
+PIN = os.environ.get("LETTER_QUEST_PIN", "").strip()
+
+
+class DataError(Exception):
+    """On-disk data is present but unreadable. Do not invent an empty list."""
+
+
+def can_write(ip: str, pin: str = "", provided: str | None = None) -> bool:
+    pin = (pin or "").strip()
+    if pin:
+        return provided == pin
+    return _is_lan(ip)
+
+
+def _is_lan(ip: str) -> bool:
+    if not ip:
+        return False
+    if ip.startswith("::ffff:"):
+        ip = ip[7:]
+    if ip in {"127.0.0.1", "::1", "localhost"}:
+        return True
+    parts = ip.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        a, b = int(parts[0]), int(parts[1])
+    except ValueError:
+        return False
+    return a == 127 or a == 10 or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31)
 
 
 def speak_wav(text: str) -> bytes | None:
@@ -69,17 +101,18 @@ def load_words() -> list[str]:
     if WORDS_JSON.exists():
         try:
             data = json.loads(WORDS_JSON.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and isinstance(data.get("words"), list):
-                return parse_words(" ".join(str(x) for x in data["words"]))
-            if isinstance(data, list):
-                return parse_words(" ".join(str(x) for x in data))
-        except (OSError, json.JSONDecodeError, TypeError):
-            pass
+        except (OSError, json.JSONDecodeError) as exc:
+            raise DataError("words.json is not valid") from exc
+        if isinstance(data, dict) and isinstance(data.get("words"), list):
+            return parse_words(" ".join(str(x) for x in data["words"]))
+        if isinstance(data, list):
+            return parse_words(" ".join(str(x) for x in data))
+        raise DataError("words.json is not a word list")
     if WORDS_TXT.exists():
         try:
             return parse_words(WORDS_TXT.read_text(encoding="utf-8"))
-        except OSError:
-            pass
+        except OSError as exc:
+            raise DataError("words.txt cannot be read") from exc
     return []
 
 
@@ -99,10 +132,10 @@ def load_bundled_catalog() -> dict:
         return _empty_catalog()
     try:
         data = json.loads(BUNDLED_CATALOG.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return _empty_catalog()
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DataError("catalog.json is not valid") from exc
     if not isinstance(data, dict):
-        return _empty_catalog()
+        raise DataError("catalog.json is not a catalog")
     lessons = data.get("lessons") if isinstance(data.get("lessons"), dict) else {}
     units = data.get("units") if isinstance(data.get("units"), list) else []
     return {"units": units, "lessons": lessons}
@@ -113,8 +146,8 @@ def load_overlay() -> dict:
         return {}
     try:
         data = json.loads(LESSONS_OVERLAY.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DataError("lessons.json is not valid") from exc
     if isinstance(data, dict) and isinstance(data.get("lessons"), dict):
         return data["lessons"]
     if isinstance(data, dict):
@@ -209,19 +242,51 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Letter-Quest-Pin")
         self.end_headers()
+
+    def _allow_write(self) -> bool:
+        provided = self.headers.get("X-Letter-Quest-Pin")
+        if not provided:
+            qs = parse_qs(urlparse(self.path).query)
+            provided = (qs.get("pin") or [None])[0]
+        if can_write(self.client_address[0], pin=PIN, provided=provided):
+            return True
+        self._json(403, {"ok": False, "error": "not allowed"})
+        return False
+
+    def _read_body(self) -> str | None:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        if length > BODY_LIMIT:
+            self._json(413, {"ok": False, "error": "too large"})
+            return None
+        return self.rfile.read(length).decode("utf-8", "replace")
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
-        if path == "/api/health":
-            self._json(200, {"ok": True, "words": len(load_words()), "tts": bool(ESPEAK)})
-            return
-        if path == "/api/words":
-            self._json(200, {"words": load_words()})
-            return
-        if path == "/api/lessons":
-            self._json(200, load_catalog())
+        try:
+            if path == "/api/health":
+                self._json(
+                    200,
+                    {
+                        "ok": True,
+                        "words": len(load_words()),
+                        "tts": bool(ESPEAK),
+                        "writes": "pin" if PIN else "lan",
+                    },
+                )
+                return
+            if path == "/api/words":
+                self._json(200, {"words": load_words()})
+                return
+            if path == "/api/lessons":
+                self._json(200, load_catalog())
+                return
+        except DataError as exc:
+            self._json(500, {"ok": False, "error": str(exc)})
             return
         if path == "/api/say":
             qs = parse_qs(urlparse(self.path).query)
@@ -243,30 +308,42 @@ class Handler(SimpleHTTPRequestHandler):
     def do_PUT(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/lessons":
-            self._write_lesson()
+            if self._allow_write():
+                self._write_lesson()
             return
-        self._write_words()
+        if path == "/api/words":
+            if self._allow_write():
+                self._write_words()
+            return
+        self.send_error(404)
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/lessons":
-            self._write_lesson()
+            if self._allow_write():
+                self._write_lesson()
             return
         if path == "/api/words":
-            self._write_words()
+            if self._allow_write():
+                self._write_words()
             return
         self.send_error(404)
 
     def do_DELETE(self) -> None:
         path = urlparse(self.path).path
+        if not self._allow_write():
+            return
         if path == "/api/lessons":
             qs = parse_qs(urlparse(self.path).query)
             lid = re.sub(r"[^A-Za-z0-9._-]", "", (qs.get("id") or [""])[0])
-            overlay = load_overlay()
-            if lid and lid in overlay:
-                del overlay[lid]
-                save_overlay(overlay)
-            self._json(200, load_catalog())
+            try:
+                overlay = load_overlay()
+                if lid and lid in overlay:
+                    del overlay[lid]
+                    save_overlay(overlay)
+                self._json(200, load_catalog())
+            except DataError as exc:
+                self._json(500, {"ok": False, "error": str(exc)})
             return
         if path != "/api/words":
             self.send_error(404)
@@ -275,8 +352,9 @@ class Handler(SimpleHTTPRequestHandler):
         self._json(200, {"ok": True, "words": []})
 
     def _write_lesson(self) -> None:
-        length = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(length).decode("utf-8", "replace")
+        raw = self._read_body()
+        if raw is None:
+            return
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
@@ -286,17 +364,18 @@ class Handler(SimpleHTTPRequestHandler):
         if not lesson:
             self._json(400, {"ok": False, "error": "need an id and some words or a chain"})
             return
-        overlay = load_overlay()
-        overlay[lesson["id"]] = lesson
-        save_overlay(overlay)
-        self._json(200, {"ok": True, "lesson": lesson, "catalog": load_catalog()})
+        try:
+            overlay = load_overlay()
+            overlay[lesson["id"]] = lesson
+            save_overlay(overlay)
+            self._json(200, {"ok": True, "lesson": lesson, "catalog": load_catalog()})
+        except DataError as exc:
+            self._json(500, {"ok": False, "error": str(exc)})
 
     def _write_words(self) -> None:
-        if urlparse(self.path).path != "/api/words":
-            self.send_error(404)
+        raw = self._read_body()
+        if raw is None:
             return
-        length = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(length).decode("utf-8", "replace")
         text = raw
         try:
             data = json.loads(raw)
@@ -317,6 +396,12 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> None:
     DATA.mkdir(parents=True, exist_ok=True)
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
+
+    def stop(_signum, _frame) -> None:
+        threading.Thread(target=httpd.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
     print(f"Letter Quest  http://{HOST}:{PORT}  data={DATA}", flush=True)
     httpd.serve_forever()
 

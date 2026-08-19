@@ -2,6 +2,8 @@
 
 A 3D word-hunting game for a 1st grader. Walk an island, mine glowing letter blocks, spell the word.
 
+Code review uses [ENGINEERING_STANDARDS.md](ENGINEERING_STANDARDS.md). Cite rules by id (`ENG-04`).
+
 This folder is a small web server you run as a container. Open it on a laptop, tablet, or phone on your home network.
 
 ## Run it
@@ -44,7 +46,15 @@ To add next week's sheet, fill **ADD A LESSON**:
 
 Saved lessons live in `data/lessons.json` and show up on every device.
 
+Writes to `/api/lessons` and `/api/words` are allowed from this LAN (or localhost). Set `LETTER_QUEST_PIN` if the game is reachable from the public internet; then every save must send that pin.
+
 The bundled sets are original practice words for the same *ideas* (short a/i/o/u/e). They are not official UFLI printables. Lesson **39b** is the homework photo you shared.
+
+## Tests
+
+```bash
+python3 -m unittest tests.test_server -v
+```
 
 ## Load spelling words
 

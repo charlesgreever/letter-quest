@@ -59,6 +59,8 @@
   .act{width:78px;height:78px;border-radius:50%;font-family:inherit;font-size:10px;color:#fff;text-shadow:2px 2px 0 #000;
     border:4px solid #1a1a1a;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.3}
   #mineBtn{background:linear-gradient(#e07a2a,#b45309);box-shadow:inset 4px 4px 0 #f0b27a,inset -4px -4px 0 #7a3706,0 5px 0 #5a2804}
+  #buildBtn{width:68px;height:68px;font-size:8px;background:linear-gradient(#8b5a2b,#5c3a18);box-shadow:inset 3px 3px 0 #c4924a,inset -3px -3px 0 #3d2410,0 4px 0 #2a1808}
+  #buildBtn b{display:block;font-size:11px;margin-top:2px;color:#ffe566}
   #jumpBtn{width:62px;height:62px;font-size:8px;background:linear-gradient(#5aa0e0,#2a6fad);box-shadow:inset 3px 3px 0 #9cc9f0,inset -3px -3px 0 #1d4e7a,0 4px 0 #163a5c}
   .act:active{transform:translateY(3px);box-shadow:inset 3px 3px 0 rgba(255,255,255,.2)}
   .act.hot{filter:brightness(1.25)}
@@ -145,6 +147,7 @@
   </div>
   <div id="acts" class="ui">
     <button class="act hit" id="jumpBtn">JUMP</button>
+    <button class="act hit" id="buildBtn">BUILD<b id="blockCount">16</b></button>
     <button class="act hit" id="mineBtn">MINE</button>
   </div>
 </div>
@@ -155,7 +158,8 @@
     <div class="sub">A BLOCKY WORD ADVENTURE</div>
     <div class="how">
       SPELL THE WORD. CHANGE ONE LETTER.<br>
-      FIND HEART WORDS. READ THE SENTENCE.
+      FIND HEART WORDS. READ THE SENTENCE.<br>
+      MINE DIRT AND BUILD STAIRS IF YOU GET STUCK.
     </div><br>
     <button class="btn green big hit" id="playBtn">PLAY</button>
     <button class="btn big hit" id="lessonPlay" style="margin-top:10px">LESSONS</button>
@@ -761,7 +765,12 @@
   var stick = { x: 0, y: 0, active: false, id: null };
   var keys = {};
   var mining = false;
+  var placing = false;
   var jumpHeld = false;
+  var BLOCK_FLOOR = 8;
+  var BLOCK_MAX = 48;
+  var blocks = 16;
+  var lastBlock = 2;
   var lookPtr = { id: null, x: 0, y: 0, moved: false };
   var target = null;
   var running = false;
@@ -912,7 +921,7 @@
     L.hearts.forEach(function (h, i) {
       if (i >= L.chains.length) q.push({ type: 'heart', word: h });
     });
-    L.words.forEach(function (w) { q.push({ type: 'spell', word: w, tag: 'SHORT U' }); });
+    L.words.forEach(function (w) { q.push({ type: 'spell', word: w, tag: (L.concept || 'PRACTICE').toUpperCase() }); });
     return q;
   }
   function setSignLabel(text) {
@@ -922,6 +931,7 @@
   function updateHud() {
     $('#score').textContent = G.score;
     $('#level').textContent = G.level;
+    refreshBlocks();
     if (G.score > best) {
       best = G.score;
       $('#best').textContent = best;
@@ -1061,6 +1071,9 @@
     });
     spawnPlayer();
     G.score = 0; G.level = 0; deck = {};
+    blocks = 16;
+    lastBlock = DIRT;
+    refreshBlocks();
     function kickOff() {
       G.quests = (lessonId && LESSONS[lessonId] && !customWords.length) ? buildLessonQuests(lessonId) : [];
       startQuest();
@@ -1193,6 +1206,67 @@
     return { id: id, ch: ch };
   }
 
+  function refreshBlocks() {
+    var el = $('#blockCount');
+    if (el) el.textContent = String(blocks);
+  }
+  function gainBlock(id) {
+    if (id && id !== AIR && id !== WATER && id !== 99) lastBlock = id === GRASS ? DIRT : id;
+    blocks = Math.min(BLOCK_MAX, blocks + 1);
+    refreshBlocks();
+  }
+  function spendBlock() {
+    if (blocks > BLOCK_FLOOR) blocks--;
+    refreshBlocks();
+  }
+  function cellOverlapsPlayer(x, y, z) {
+    var r = 0.32;
+    return player.x + r > x && player.x - r < x + 1 &&
+      player.y + 1.55 > y && player.y + 0.02 < y + 1 &&
+      player.z + r > z && player.z - r < z + 1;
+  }
+  function canPlaceAt(x, y, z) {
+    if (!world.inb(x, y, z)) return false;
+    if (y <= 0 || y >= H - 1) return false;
+    if (world.letterAt(x, y, z)) return false;
+    var id = world.get(x, y, z);
+    if (id && id !== AIR && id !== WATER) return false;
+    if (cellOverlapsPlayer(x, y, z)) return false;
+    return true;
+  }
+  function pickPlaceCell() {
+    var lx = -Math.sin(orbit.yaw), lz = -Math.cos(orbit.yaw), ly = -0.18;
+    var len = Math.hypot(lx, ly, lz) || 1;
+    var hit = voxelMarch(player.x, player.y + 1.15, player.z, lx / len, ly / len, lz / len, 5);
+    var tries = [];
+    if (hit) {
+      tries.push({ x: hit.px, y: hit.py, z: hit.pz });
+      tries.push({ x: hit.x, y: hit.y + 1, z: hit.z });
+    }
+    var fx = Math.floor(player.x - Math.sin(orbit.yaw) * 1.4);
+    var fz = Math.floor(player.z - Math.cos(orbit.yaw) * 1.4);
+    tries.push({ x: fx, y: heightAt(fx, fz) + 1, z: fz });
+    var i;
+    for (i = 0; i < tries.length; i++) {
+      if (canPlaceAt(tries[i].x, tries[i].y, tries[i].z)) return tries[i];
+    }
+    return null;
+  }
+  function placeBlock() {
+    if (!running || locked) return false;
+    var cell = pickPlaceCell();
+    if (!cell) { toast('AIM AT THE GROUND', 800); return false; }
+    var was = world.get(cell.x, cell.y, cell.z);
+    var kind = lastBlock || DIRT;
+    if (kind === GRASS) kind = DIRT;
+    world.set(cell.x, cell.y, cell.z, kind);
+    rebuildType(kind);
+    if (was === WATER) rebuildType(WATER);
+    spendBlock();
+    tone(240, 0.05, 'square', 0.07);
+    return true;
+  }
+
   function collectLetter(ch, sx, sy) {
     if (G.mode === 'heart' && (ch === '*' || ch === G.word[0])) {
       G.slots.forEach(function (sl) { sl.filled = true; });
@@ -1266,7 +1340,10 @@
     if (!res) return;
     sndDig();
     if (res.ch) collectLetter(res.ch, scr.x, scr.y);
-    else burst(scr.x, scr.y, ['#c4a574', '#8a6a3a'], 10, 2.4);
+    else {
+      gainBlock(res.id);
+      burst(scr.x, scr.y, ['#c4a574', '#8a6a3a'], 10, 2.4);
+    }
   }
 
   function nearestNeeded() {
@@ -1360,11 +1437,20 @@
   });
   $('#jumpBtn').addEventListener('pointerup', function () { jumpHeld = false; $('#jumpBtn').classList.remove('hot'); });
   $('#jumpBtn').addEventListener('pointerleave', function () { jumpHeld = false; $('#jumpBtn').classList.remove('hot'); });
+  $('#buildBtn').addEventListener('pointerdown', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    placing = true; $('#buildBtn').classList.add('hot');
+    placeCool = 0.22;
+    placeBlock();
+  });
+  $('#buildBtn').addEventListener('pointerup', function () { placing = false; $('#buildBtn').classList.remove('hot'); });
+  $('#buildBtn').addEventListener('pointerleave', function () { placing = false; $('#buildBtn').classList.remove('hot'); });
 
   window.addEventListener('keydown', function (e) {
     keys[e.code] = true;
     if (e.code === 'Space') { e.preventDefault(); jumpHeld = true; }
     if (e.code === 'KeyE' || e.code === 'KeyF') { doMineHit(pickMineTarget()); }
+    if (e.code === 'KeyQ' || e.code === 'KeyR') { placeBlock(); }
   });
   window.addEventListener('keyup', function (e) {
     keys[e.code] = false;
@@ -1420,6 +1506,26 @@
     if (!L) return id || '';
     return (L.id || id) + '  ' + (L.title || '').toUpperCase();
   }
+  function catalogRow(id) {
+    var L = LESSONS[id] || {};
+    var row = document.createElement('div');
+    row.className = 'cat-item' + (id === lessonId ? ' on' : '');
+    var title = document.createElement('b');
+    title.textContent = (L.id || id) + '  ' + (L.title || '');
+    var concept = document.createElement('span');
+    concept.textContent = L.concept || '';
+    var wrap = document.createElement('div');
+    wrap.appendChild(title);
+    wrap.appendChild(concept);
+    row.appendChild(wrap);
+    row.addEventListener('click', function () {
+      lessonId = id;
+      localStorage.setItem('lq_lesson', id);
+      renderCatalog();
+      refreshWordsUI();
+    });
+    return row;
+  }
   function renderCatalog() {
     var box = $('#catalogList');
     if (!box) return;
@@ -1439,17 +1545,7 @@
       box.appendChild(h);
       ids.forEach(function (id) {
         seen[id] = 1;
-        var L = LESSONS[id];
-        var row = document.createElement('div');
-        row.className = 'cat-item' + (id === lessonId ? ' on' : '');
-        row.innerHTML = '<div><b>' + (L.id || id) + '  ' + (L.title || '') + '</b><span>' + (L.concept || '') + '</span></div>';
-        row.addEventListener('click', function () {
-          lessonId = id;
-          localStorage.setItem('lq_lesson', id);
-          renderCatalog();
-          refreshWordsUI();
-        });
-        box.appendChild(row);
+        box.appendChild(catalogRow(id));
       });
     });
     var leftover = Object.keys(LESSONS).filter(function (id) { return !seen[id]; }).sort();
@@ -1458,25 +1554,20 @@
       h2.className = 'cat-unit';
       h2.textContent = 'MORE';
       box.appendChild(h2);
-      leftover.forEach(function (id) {
-        var L = LESSONS[id];
-        var row = document.createElement('div');
-        row.className = 'cat-item' + (id === lessonId ? ' on' : '');
-        row.innerHTML = '<div><b>' + (L.id || id) + '  ' + (L.title || '') + '</b><span>' + (L.concept || '') + '</span></div>';
-        row.addEventListener('click', function () {
-          lessonId = id;
-          localStorage.setItem('lq_lesson', id);
-          renderCatalog();
-          refreshWordsUI();
-        });
-        box.appendChild(row);
-      });
+      leftover.forEach(function (id) { box.appendChild(catalogRow(id)); });
     }
   }
   function loadCatalog() {
-    return fetch('/api/lessons').then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+    return fetch('/api/lessons').then(function (r) {
+      if (!r.ok) throw new Error('catalog');
+      return r.json();
+    }).then(function (data) {
       if (data && data.lessons) applyCatalog(data);
-    }).catch(function () {});
+      else throw new Error('catalog');
+    }).catch(function () {
+      var st = $('#wordsStatus');
+      if (st) st.textContent = 'Could not load lessons.';
+    });
   }
   function parseChainLines(text) {
     return String(text || '').split(/\n+/).map(function (line) {
@@ -1550,14 +1641,20 @@
     }).catch(function () { return null; });
   }
   function pullWordsFromServer() {
-    return fetch('/api/words').then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+    return fetch('/api/words').then(function (r) {
+      if (!r.ok) throw new Error('words');
+      return r.json();
+    }).then(function (data) {
       if (data && data.words && data.words.length) {
         saveWordsLocal(data.words);
         lessonId = '';
         deck = {};
         refreshWordsUI();
       }
-    }).catch(function () {});
+    }).catch(function () {
+      var st = $('#wordsStatus');
+      if (st && !st.textContent) st.textContent = 'Could not load saved words.';
+    });
   }
   function openWords() {
     $('#wordsPanel').classList.add('show');
@@ -1594,7 +1691,10 @@
     sndClick();
     if (running) startQuest();
     toast('BACK TO BUILT-IN WORDS', 1200);
-    fetch('/api/words', { method: 'DELETE' }).catch(function () {});
+    fetch('/api/words', { method: 'DELETE' }).catch(function () {
+      var st = $('#wordsStatus');
+      if (st) st.textContent = 'Could not clear the shared list.';
+    });
   }
   function useLesson(id) {
     if (!id || !LESSONS[id]) {
@@ -1660,6 +1760,7 @@
   var last = performance.now();
   var walkPhase = 0;
   var mineCool = 0;
+  var placeCool = 0;
 
   function update(dt) {
     if (!running) return;
@@ -1753,6 +1854,11 @@
       var hold = pickMineTarget();
       if (hold && !hold.fromLetter) doMineHit(hold);
       mineCool = 0.28;
+    }
+    placeCool -= dt;
+    if (placing && placeCool <= 0) {
+      placeBlock();
+      placeCool = 0.22;
     }
 
     // letters pulse

@@ -10,4 +10,5 @@ services:
     environment:
       PORT: "8080"
       DATA_DIR: /data
+      # LETTER_QUEST_PIN: "change-me"
     restart: unless-stopped
