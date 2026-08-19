@@ -1,0 +1,121 @@
+{
+  "units": [
+    {
+      "id": "short-vowels",
+      "title": "Short vowels",
+      "blurb": "CVC and blend review. Change one letter to make a new word."
+    },
+    {
+      "id": "custom",
+      "title": "Our lessons",
+      "blurb": "Homework you add from the catalog."
+    }
+  ],
+  "lessons": {
+    "35": {
+      "id": "35",
+      "title": "Short A",
+      "concept": "short a review",
+      "unit": "short-vowels",
+      "words": ["cap", "map", "sad", "bag", "jam", "flag"],
+      "chains": [
+        { "steps": ["cat", "hat", "has", "ham"] },
+        { "steps": ["mad", "map", "tap", "tag"] }
+      ],
+      "hearts": ["the", "a", "was"],
+      "sentences": ["The cat has a hat.", "I was sad."]
+    },
+    "36": {
+      "id": "36",
+      "title": "Short I",
+      "concept": "short i review",
+      "unit": "short-vowels",
+      "words": ["sit", "pin", "lid", "dig", "swim", "grip"],
+      "chains": [
+        { "steps": ["sit", "sip", "tip", "tin"] },
+        { "steps": ["big", "dig", "dim", "him"] }
+      ],
+      "hearts": ["is", "his", "I"],
+      "sentences": ["His pin is big.", "I sit and sip."]
+    },
+    "37": {
+      "id": "37",
+      "title": "Short O",
+      "concept": "short o review",
+      "unit": "short-vowels",
+      "words": ["hot", "mop", "log", "box", "spot", "frog"],
+      "chains": [
+        { "steps": ["hot", "hop", "top", "tap"] },
+        { "steps": ["log", "lot", "pot", "pop"] }
+      ],
+      "hearts": ["to", "do", "of"],
+      "sentences": ["The frog is on a log.", "Do not hop on the box."]
+    },
+    "38": {
+      "id": "38",
+      "title": "A I O Review",
+      "concept": "short a, i, o review",
+      "unit": "short-vowels",
+      "words": ["cat", "sit", "hot", "map", "dig", "box"],
+      "chains": [
+        { "steps": ["cat", "cot", "dot", "dog"] },
+        { "steps": ["sit", "sat", "sap", "sip"] }
+      ],
+      "hearts": ["was", "to", "is"],
+      "sentences": ["The dog sat on a log.", "It was hot."]
+    },
+    "39": {
+      "id": "39",
+      "title": "Short U",
+      "concept": "short u review",
+      "unit": "short-vowels",
+      "words": ["sun", "cup", "bug", "run", "drum", "jump"],
+      "chains": [
+        { "steps": ["sun", "run", "rug", "mug"] },
+        { "steps": ["cup", "cap", "cat", "cut"] }
+      ],
+      "hearts": ["the", "was", "of"],
+      "sentences": ["The bug is in a cup.", "I can run in the sun."]
+    },
+    "39b": {
+      "id": "39b",
+      "title": "Short U Advanced",
+      "concept": "short u advanced review",
+      "unit": "short-vowels",
+      "source": "home practice photo",
+      "words": ["spun", "plum", "dust", "rugs", "bump", "tusk"],
+      "chains": [
+        { "steps": ["glum", "plum", "plug", "slug"] },
+        { "steps": ["rust", "must", "dust", "gust"] }
+      ],
+      "hearts": ["look", "book", "are", "was"],
+      "sentences": ["The cubs are fast.", "I was not in a club."]
+    },
+    "40": {
+      "id": "40",
+      "title": "Short E",
+      "concept": "short e review",
+      "unit": "short-vowels",
+      "words": ["bed", "hen", "net", "red", "sled", "desk"],
+      "chains": [
+        { "steps": ["hen", "pen", "pet", "pat"] },
+        { "steps": ["bed", "red", "rid", "lid"] }
+      ],
+      "hearts": ["said", "says", "they"],
+      "sentences": ["The hen is in the bed.", "They said yes."]
+    },
+    "41": {
+      "id": "41",
+      "title": "All Short Vowels",
+      "concept": "short vowel review",
+      "unit": "short-vowels",
+      "words": ["cat", "sit", "hot", "sun", "hen", "jump"],
+      "chains": [
+        { "steps": ["cat", "cut", "cup", "cap"] },
+        { "steps": ["sit", "set", "sat", "sad"] }
+      ],
+      "hearts": ["was", "are", "said", "the"],
+      "sentences": ["The cub sat in the sun.", "They are sad."]
+    }
+  }
+}

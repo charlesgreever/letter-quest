@@ -30,6 +30,22 @@ docker compose up -d --build
 podman compose up -d --build
 ```
 
+## Lessons
+
+Tap **LESSONS**. The catalog has short-vowel practice sets plus any homework you add.
+
+To add next week's sheet, fill **ADD A LESSON**:
+
+- id like `42` or `42b`
+- practice words
+- word chains (`glum > plum > plug`)
+- heart words
+- sentences
+
+Saved lessons live in `data/lessons.json` and show up on every device.
+
+The bundled sets are original practice words for the same *ideas* (short a/i/o/u/e). They are not official UFLI printables. Lesson **39b** is the homework photo you shared.
+
 ## Load spelling words
 
 In the game: **LOAD WORDS** (title screen) or **WORDS** (top right).
@@ -73,5 +89,6 @@ letter-quest/
   Dockerfile
   compose.yaml
   run.sh
-  data/                 persisted word list (volume)
+  public/catalog.json   bundled lesson catalog
+  data/                 word lists + added lessons (volume)
 ```

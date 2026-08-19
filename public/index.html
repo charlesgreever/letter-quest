@@ -83,16 +83,27 @@
   .cross:before{left:6px;top:0;width:2px;height:14px}
   .cross:after{left:0;top:6px;width:14px;height:2px}
 
-  #wordsPanel{position:absolute;inset:0;z-index:40;background:rgba(8,24,40,.82);display:none;align-items:center;justify-content:center;padding:16px}
+  #wordsPanel{position:absolute;inset:0;z-index:40;background:rgba(8,24,40,.82);display:none;align-items:flex-start;justify-content:center;padding:12px;overflow:auto}
   #wordsPanel.show{display:flex}
-  .wp{width:min(520px,96%);background:linear-gradient(#c4924a,#8a5a28);border:3px solid #4a2e12;border-radius:8px;padding:16px;text-align:left;
-    box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 6px 0 rgba(0,0,0,.3)}
+  .wp{width:min(560px,96%);background:linear-gradient(#c4924a,#8a5a28);border:3px solid #4a2e12;border-radius:8px;padding:14px;text-align:left;
+    box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 6px 0 rgba(0,0,0,.3);margin:auto}
   .wp h2{margin:0 0 8px;font-size:12px;color:#ffe566;text-shadow:2px 2px 0 #000}
   .wp p{margin:0 0 10px;font-size:8px;line-height:1.8;color:#fff8e8;text-shadow:2px 2px 0 rgba(0,0,0,.45)}
-  #wordsBox{width:100%;height:160px;font-family:inherit;font-size:10px;line-height:1.7;padding:10px;border:3px solid #4a2e12;
+  #wordsBox,#addId,#addTitle,#addConcept,#addWords,#addChains,#addHearts,#addSentences{
+    width:100%;font-family:inherit;font-size:10px;line-height:1.7;padding:8px;border:3px solid #4a2e12;
     background:#fff8e8;color:#2a1a0a;resize:vertical;user-select:text;-webkit-user-select:text;pointer-events:auto}
+  #wordsBox,#addWords,#addChains,#addSentences{height:84px}
+  #addId,#addTitle,#addConcept,#addHearts{height:36px}
+  .wp label{display:block;font-size:7px;letter-spacing:1px;margin:8px 0 4px;color:#fff3c4;text-shadow:2px 2px 0 #000}
   .wp-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
   #wordsStatus{font-size:8px;margin-top:10px;color:#fff3c4;text-shadow:2px 2px 0 #000;min-height:12px}
+  #catalogList{max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin:8px 0 12px}
+  .cat-unit{font-size:7px;letter-spacing:1px;color:#ffe566;margin-top:6px;text-shadow:2px 2px 0 #000}
+  .cat-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(0,0,0,.28);border:2px solid #4a2e12;padding:8px;cursor:pointer}
+  .cat-item.on{outline:2px solid #ffe566}
+  .cat-item b{font-size:9px;color:#fff}
+  .cat-item span{font-size:7px;color:#fff3c4;display:block;margin-top:4px}
+  .add-block{border-top:2px solid rgba(0,0,0,.25);margin-top:12px;padding-top:10px}
 
   @media (max-width:520px){
     .title{font-size:20px}
@@ -124,7 +135,7 @@
     <button class="btn hit" id="sayBtn">SAY IT</button>
     <button class="btn hit" id="hintBtn">HINT</button>
     <button class="btn hit" id="muteBtn">SOUND</button>
-    <button class="btn hit" id="wordsBtn">WORDS</button>
+    <button class="btn hit" id="wordsBtn">LESSONS</button>
     <button class="btn hit" id="resetBtn">NEW</button>
   </div>
   <div class="cross"></div>
@@ -143,26 +154,49 @@
     <div class="title">LETTER<br>QUEST</div>
     <div class="sub">A BLOCKY WORD ADVENTURE</div>
     <div class="how">
-      SPELL SHORT U WORDS<br>
-      CHANGE ONE LETTER TO MAKE A NEW WORD<br>
-      FIND THE HEART WORDS
+      SPELL THE WORD. CHANGE ONE LETTER.<br>
+      FIND HEART WORDS. READ THE SENTENCE.
     </div><br>
     <button class="btn green big hit" id="playBtn">PLAY</button>
-    <button class="btn big hit" id="lessonPlay" style="margin-top:10px">LESSON 39B</button>
-    <button class="btn big hit" id="wordsBtn2" style="margin-top:10px">LOAD WORDS</button>
+    <button class="btn big hit" id="lessonPlay" style="margin-top:10px">LESSONS</button>
+    <button class="btn big hit" id="wordsBtn2" style="margin-top:10px">WORDS</button>
     <div id="customNote" style="margin-top:12px;font-size:8px;text-shadow:2px 2px 0 #000"></div>
   </div>
 </div>
 <div id="wordsPanel" class="hit">
   <div class="wp">
-    <h2>SPELLING WORDS</h2>
-    <p>Paste this week's list, or tap LESSON 39B for this homework (short u, word chains, heart words).</p>
-    <textarea id="wordsBox" spellcheck="false" placeholder="cat&#10;sun&#10;jump&#10;friend"></textarea>
+    <h2>LESSON CATALOG</h2>
+    <p>Pick this week's lesson, or add next week's homework at the bottom.</p>
+    <div id="catalogList"></div>
     <div class="wp-row">
-      <button class="btn green hit" id="lessonBtn">LESSON 39B</button>
-      <button class="btn green hit" id="wordsUse">USE THESE WORDS</button>
-      <button class="btn hit" id="wordsClear">BUILT-IN LIST</button>
+      <button class="btn green hit" id="lessonBtn">PLAY LESSON</button>
       <button class="btn hit" id="wordsClose">CLOSE</button>
+    </div>
+    <div class="add-block">
+      <h2>ADD A LESSON</h2>
+      <label>LESSON ID (example 42 or 42b)</label>
+      <input id="addId" maxlength="12" placeholder="42b">
+      <label>TITLE</label>
+      <input id="addTitle" maxlength="40" placeholder="Short U Advanced">
+      <label>CONCEPT</label>
+      <input id="addConcept" maxlength="80" placeholder="short u advanced review">
+      <label>PRACTICE WORDS (one per line)</label>
+      <textarea id="addWords" placeholder="spun&#10;plum&#10;dust"></textarea>
+      <label>WORD CHAINS (one chain per line, arrows or commas)</label>
+      <textarea id="addChains" placeholder="glum > plum > plug > slug&#10;rust > must > dust > gust"></textarea>
+      <label>HEART WORDS (comma or line)</label>
+      <input id="addHearts" placeholder="look, book, are, was">
+      <label>SENTENCES (one per line)</label>
+      <textarea id="addSentences" placeholder="The cubs are fast."></textarea>
+      <div class="wp-row">
+        <button class="btn green hit" id="addSave">SAVE LESSON</button>
+      </div>
+    </div>
+    <h2 style="margin-top:16px">OR JUST PASTE WORDS</h2>
+    <textarea id="wordsBox" spellcheck="false" placeholder="cat&#10;sun&#10;jump"></textarea>
+    <div class="wp-row">
+      <button class="btn green hit" id="wordsUse">USE THESE WORDS</button>
+      <button class="btn hit" id="wordsClear">NO LESSON</button>
     </div>
     <div id="wordsStatus"></div>
   </div>
@@ -193,19 +227,8 @@
     5: ['house','apple','snake','horse','cloud','train','bread','sheep','light','water','plant','happy','night','green','chair','table','mouse','lemon','peach','tiger','grape','again','great','under','where','after'],
     6: ['school','friend','summer','winter','orange','purple','yellow','monkey','dinner','garden','pencil','little','sister','brother']
   };
-  var LESSONS = {
-    '39b': {
-      title: 'Short U',
-      concept: 'short u advanced review',
-      words: ['spun','plum','dust','rugs','bump','tusk'],
-      chains: [
-        { steps: ['glum','plum','plug','slug'] },
-        { steps: ['rust','must','dust','gust'] }
-      ],
-      hearts: ['look','book','are','was'],
-      sentences: ['The cubs are fast.', 'I was not in a club.']
-    }
-  };
+  var LESSONS = {};
+  var CATALOG = { units: [], lessons: {} };
   var PRAISE = ['YOU SPELLED IT!','WORD MINER!','NICE HUNTING!','SUPER SPELLER!','YOU FOUND IT!','AMAZING!'];
   var CHAIN_PRAISE = ['NEW WORD!','YOU CHANGED IT!','WORD CHAIN!','NICE SWAP!'];
 
@@ -1038,10 +1061,14 @@
     });
     spawnPlayer();
     G.score = 0; G.level = 0; deck = {};
-    G.quests = (lessonId && LESSONS[lessonId] && !customWords.length) ? buildLessonQuests(lessonId) : [];
-    startQuest();
-    running = true;
-    $('#hud').classList.add('live');
+    function kickOff() {
+      G.quests = (lessonId && LESSONS[lessonId] && !customWords.length) ? buildLessonQuests(lessonId) : [];
+      startQuest();
+      running = true;
+      $('#hud').classList.add('live');
+    }
+    if (lessonId && !LESSONS[lessonId]) loadCatalog().then(kickOff);
+    else kickOff();
   }
 
   function collide(nx, ny, nz) {
@@ -1378,23 +1405,137 @@
   }
   $('#playBtn').addEventListener('click', startFromTitle);
   $('#lessonPlay').addEventListener('click', function () {
-    lessonId = '39b';
-    localStorage.setItem('lq_lesson', '39b');
-    saveWordsLocal([]);
-    startFromTitle();
+    sndClick();
+    openWords();
   });
+  function applyCatalog(data) {
+    CATALOG = data || { units: [], lessons: {} };
+    LESSONS = CATALOG.lessons || {};
+    if (lessonId && !LESSONS[lessonId]) lessonId = Object.keys(LESSONS)[0] || '';
+    renderCatalog();
+    refreshWordsUI();
+  }
+  function lessonLabel(id) {
+    var L = LESSONS[id];
+    if (!L) return id || '';
+    return (L.id || id) + '  ' + (L.title || '').toUpperCase();
+  }
+  function renderCatalog() {
+    var box = $('#catalogList');
+    if (!box) return;
+    box.innerHTML = '';
+    var units = (CATALOG.units && CATALOG.units.length) ? CATALOG.units : [{ id: 'all', title: 'Lessons' }];
+    var seen = {};
+    units.forEach(function (u) {
+      var ids = Object.keys(LESSONS).filter(function (id) {
+        return (LESSONS[id].unit || 'custom') === (u.id || 'custom');
+      }).sort(function (a, b) {
+        return String(a).localeCompare(String(b), undefined, { numeric: true });
+      });
+      if (!ids.length) return;
+      var h = document.createElement('div');
+      h.className = 'cat-unit';
+      h.textContent = (u.title || u.id || '').toUpperCase();
+      box.appendChild(h);
+      ids.forEach(function (id) {
+        seen[id] = 1;
+        var L = LESSONS[id];
+        var row = document.createElement('div');
+        row.className = 'cat-item' + (id === lessonId ? ' on' : '');
+        row.innerHTML = '<div><b>' + (L.id || id) + '  ' + (L.title || '') + '</b><span>' + (L.concept || '') + '</span></div>';
+        row.addEventListener('click', function () {
+          lessonId = id;
+          localStorage.setItem('lq_lesson', id);
+          renderCatalog();
+          refreshWordsUI();
+        });
+        box.appendChild(row);
+      });
+    });
+    var leftover = Object.keys(LESSONS).filter(function (id) { return !seen[id]; }).sort();
+    if (leftover.length) {
+      var h2 = document.createElement('div');
+      h2.className = 'cat-unit';
+      h2.textContent = 'MORE';
+      box.appendChild(h2);
+      leftover.forEach(function (id) {
+        var L = LESSONS[id];
+        var row = document.createElement('div');
+        row.className = 'cat-item' + (id === lessonId ? ' on' : '');
+        row.innerHTML = '<div><b>' + (L.id || id) + '  ' + (L.title || '') + '</b><span>' + (L.concept || '') + '</span></div>';
+        row.addEventListener('click', function () {
+          lessonId = id;
+          localStorage.setItem('lq_lesson', id);
+          renderCatalog();
+          refreshWordsUI();
+        });
+        box.appendChild(row);
+      });
+    }
+  }
+  function loadCatalog() {
+    return fetch('/api/lessons').then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+      if (data && data.lessons) applyCatalog(data);
+    }).catch(function () {});
+  }
+  function parseChainLines(text) {
+    return String(text || '').split(/\n+/).map(function (line) {
+      var steps = line.toLowerCase().split(/[^a-z]+/).filter(function (w) { return w.length >= 2 && w.length <= 12; });
+      return steps.length >= 2 ? { steps: steps } : null;
+    }).filter(Boolean);
+  }
+  function saveNewLesson() {
+    var payload = {
+      id: ($('#addId').value || '').trim(),
+      title: ($('#addTitle').value || '').trim(),
+      concept: ($('#addConcept').value || '').trim(),
+      unit: 'custom',
+      words: parseWordList($('#addWords').value),
+      chains: parseChainLines($('#addChains').value),
+      hearts: parseWordList($('#addHearts').value),
+      sentences: String($('#addSentences').value || '').split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean)
+    };
+    if (!payload.id) {
+      $('#wordsStatus').textContent = 'Need a lesson id like 42b.';
+      return;
+    }
+    fetch('/api/lessons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (!data || !data.ok) {
+        $('#wordsStatus').textContent = (data && data.error) || 'Could not save.';
+        return;
+      }
+      applyCatalog(data.catalog);
+      lessonId = data.lesson.id;
+      localStorage.setItem('lq_lesson', lessonId);
+      saveWordsLocal([]);
+      renderCatalog();
+      refreshWordsUI();
+      toast('SAVED LESSON  ' + lessonId.toUpperCase(), 1400);
+      sndClick();
+    }).catch(function () {
+      $('#wordsStatus').textContent = 'Could not reach the lesson catalog.';
+    });
+  }
   function refreshWordsUI() {
     var n = customWords.length;
     var note = $('#customNote');
-    if (note) note.textContent = n ? (n + ' CUSTOM WORDS LOADED') : '';
+    var L = lessonId && LESSONS[lessonId];
+    if (note) {
+      if (n) note.textContent = n + ' CUSTOM WORDS LOADED';
+      else if (L) note.textContent = 'LESSON ' + lessonLabel(lessonId);
+      else note.textContent = '';
+    }
     var box = $('#wordsBox');
     if (box && !box.value.trim() && n) box.value = customWords.join('\n');
     var st = $('#wordsStatus');
     if (st) {
-      if (lessonId && LESSONS[lessonId] && !n) st.textContent = 'Lesson 39b — short u, chains, heart words';
+      if (L && !n) st.textContent = 'Lesson ' + (L.id || lessonId) + ' — ' + (L.concept || L.title || '');
       else st.textContent = n ? (n + ' words ready') : 'Using built-in 1st grade words';
     }
-    if (note && lessonId && !n) note.textContent = 'LESSON 39B  SHORT U';
   }
   function saveWordsLocal(list) {
     customWords = list || [];
@@ -1421,8 +1562,8 @@
   function openWords() {
     $('#wordsPanel').classList.add('show');
     if (customWords.length) $('#wordsBox').value = customWords.join('\n');
+    renderCatalog();
     refreshWordsUI();
-    $('#wordsBox').focus();
   }
   function closeWords() { $('#wordsPanel').classList.remove('show'); }
   function applyWords() {
@@ -1455,27 +1596,34 @@
     toast('BACK TO BUILT-IN WORDS', 1200);
     fetch('/api/words', { method: 'DELETE' }).catch(function () {});
   }
-  function useLesson39b() {
-    lessonId = '39b';
-    localStorage.setItem('lq_lesson', '39b');
+  function useLesson(id) {
+    if (!id || !LESSONS[id]) {
+      $('#wordsStatus').textContent = 'Pick a lesson first.';
+      return;
+    }
+    lessonId = id;
+    localStorage.setItem('lq_lesson', id);
     saveWordsLocal([]);
     deck = {};
-    G.quests = buildLessonQuests('39b');
+    G.quests = buildLessonQuests(id);
     refreshWordsUI();
+    renderCatalog();
     sndClick();
+    toast('LESSON  ' + lessonLabel(id), 1400);
     closeWords();
-    toast('LESSON 39B  SHORT U', 1400);
     if (running) startQuest();
+    else startFromTitle();
   }
   $('#wordsBtn').addEventListener('click', function (e) { e.stopPropagation(); sndClick(); openWords(); });
   $('#wordsBtn2').addEventListener('click', function (e) { e.stopPropagation(); sndClick(); openWords(); });
   $('#wordsUse').addEventListener('click', applyWords);
   $('#wordsClear').addEventListener('click', clearWords);
   $('#wordsClose').addEventListener('click', closeWords);
-  $('#lessonBtn').addEventListener('click', useLesson39b);
+  $('#lessonBtn').addEventListener('click', function () { useLesson(lessonId); });
+  $('#addSave').addEventListener('click', saveNewLesson);
   refreshMute();
   refreshWordsUI();
-  pullWordsFromServer();
+  loadCatalog().then(function () { pullWordsFromServer(); });
 
   function viewSize() {
     var w = canvas.clientWidth || window.innerWidth || document.documentElement.clientWidth || 0;
