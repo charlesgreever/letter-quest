@@ -1084,13 +1084,16 @@
     blocks = 16;
     lastBlock = DIRT;
     refreshBlocks();
+    running = true;
+    $('#hud').classList.add('live');
+    last = performance.now();
+    sizeTries = 0;
+    sizeRenderer();
     function kickOff() {
       G.quests = (lessonId && LESSONS[lessonId] && !customWords.length) ? buildLessonQuests(lessonId) : [];
       startQuest();
-      running = true;
-      $('#hud').classList.add('live');
     }
-    if (lessonId && !LESSONS[lessonId]) loadCatalog().then(kickOff);
+    if (lessonId && !LESSONS[lessonId]) loadCatalog().then(kickOff, kickOff);
     else kickOff();
   }
 
@@ -1926,7 +1929,7 @@
     titleAngle += dt * 0.18;
     var hx = world.house ? world.house.x : 14;
     var hz = world.house ? world.house.z : 14;
-    var hy = (world.house ? world.house.y : 6) + 1;
+    var hy = (world.house && world.house.hy != null ? world.house.hy : 6) + 2;
     camera.position.set(
       hx + Math.sin(titleAngle) * 13,
       hy + 8,
