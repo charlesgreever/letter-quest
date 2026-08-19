@@ -1,0 +1,13 @@
+services:
+  letter-quest:
+    build: .
+    image: letter-quest:latest
+    container_name: letter-quest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data:Z
+    environment:
+      PORT: "8080"
+      DATA_DIR: /data
+    restart: unless-stopped
