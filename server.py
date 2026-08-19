@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / "public"
@@ -17,6 +20,36 @@ WORDS_TXT = DATA / "words.txt"
 PORT = int(os.environ.get("PORT", "8080"))
 HOST = os.environ.get("HOST", "0.0.0.0")
 WORD_RE = re.compile(r"^[a-z]{2,12}$")
+SAY_SAFE = re.compile(r"[^A-Za-z0-9 .,!?'\-]")
+ESPEAK = shutil.which("espeak-ng") or shutil.which("espeak")
+
+
+def speak_wav(text: str) -> bytes | None:
+    if not ESPEAK:
+        return None
+    cleaned = SAY_SAFE.sub("", text or "").strip()[:180]
+    if not cleaned:
+        return None
+    fd, path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    try:
+        proc = subprocess.run(
+            [ESPEAK, "-w", path, "-s", "120", "-a", "180", "-ven+f3", cleaned],
+            capture_output=True,
+            timeout=8,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        data = Path(path).read_bytes()
+        return data if len(data) > 44 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 
 def parse_words(text: str) -> list[str]:
@@ -88,10 +121,25 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/health":
-            self._json(200, {"ok": True, "words": len(load_words())})
+            self._json(200, {"ok": True, "words": len(load_words()), "tts": bool(ESPEAK)})
             return
         if path == "/api/words":
             self._json(200, {"words": load_words()})
+            return
+        if path == "/api/say":
+            qs = parse_qs(urlparse(self.path).query)
+            raw = (qs.get("t") or qs.get("text") or [""])[0]
+            wav = speak_wav(raw)
+            if not wav:
+                self.send_error(503, "tts unavailable")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(wav)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(wav)
             return
         super().do_GET()
 

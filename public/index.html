@@ -29,6 +29,8 @@
   #wordRow i{font-style:normal;font-size:18px;min-width:28px;height:32px;display:flex;align-items:center;justify-content:center;
     background:rgba(0,0,0,.28);border-radius:4px;text-shadow:2px 2px 0 #000;padding:0 4px}
   #wordRow i.got{background:linear-gradient(#6ed64c,#3d9a28);box-shadow:inset 2px 2px 0 rgba(255,255,255,.28)}
+  #wordRow i.swap{background:linear-gradient(#f7d33a,#d4a017);box-shadow:inset 2px 2px 0 rgba(255,255,255,.28);animation:hintpulse .7s ease-in-out infinite}
+  #wordRow i.heart{background:linear-gradient(#ff6b9d,#c44569)}
   #hintLine{margin-top:7px;font-size:7px;color:#fff3c4;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,.5);min-height:10px}
 
   #compass{position:absolute;right:12px;top:86px;width:64px;height:64px}
@@ -141,11 +143,12 @@
     <div class="title">LETTER<br>QUEST</div>
     <div class="sub">A BLOCKY WORD ADVENTURE</div>
     <div class="how">
-      WALK UP TO A GLOWING LETTER<br>
-      PRESS THE BIG MINE BUTTON<br>
-      SPELL THE WORD ON THE SIGN
+      SPELL SHORT U WORDS<br>
+      CHANGE ONE LETTER TO MAKE A NEW WORD<br>
+      FIND THE HEART WORDS
     </div><br>
     <button class="btn green big hit" id="playBtn">PLAY</button>
+    <button class="btn big hit" id="lessonPlay" style="margin-top:10px">LESSON 39B</button>
     <button class="btn big hit" id="wordsBtn2" style="margin-top:10px">LOAD WORDS</button>
     <div id="customNote" style="margin-top:12px;font-size:8px;text-shadow:2px 2px 0 #000"></div>
   </div>
@@ -153,9 +156,10 @@
 <div id="wordsPanel" class="hit">
   <div class="wp">
     <h2>SPELLING WORDS</h2>
-    <p>Paste this week's list. One word per line, or separated by commas.</p>
+    <p>Paste this week's list, or tap LESSON 39B for this homework (short u, word chains, heart words).</p>
     <textarea id="wordsBox" spellcheck="false" placeholder="cat&#10;sun&#10;jump&#10;friend"></textarea>
     <div class="wp-row">
+      <button class="btn green hit" id="lessonBtn">LESSON 39B</button>
       <button class="btn green hit" id="wordsUse">USE THESE WORDS</button>
       <button class="btn hit" id="wordsClear">BUILT-IN LIST</button>
       <button class="btn hit" id="wordsClose">CLOSE</button>
@@ -189,7 +193,21 @@
     5: ['house','apple','snake','horse','cloud','train','bread','sheep','light','water','plant','happy','night','green','chair','table','mouse','lemon','peach','tiger','grape','again','great','under','where','after'],
     6: ['school','friend','summer','winter','orange','purple','yellow','monkey','dinner','garden','pencil','little','sister','brother']
   };
+  var LESSONS = {
+    '39b': {
+      title: 'Short U',
+      concept: 'short u advanced review',
+      words: ['spun','plum','dust','rugs','bump','tusk'],
+      chains: [
+        { steps: ['glum','plum','plug','slug'] },
+        { steps: ['rust','must','dust','gust'] }
+      ],
+      hearts: ['look','book','are','was'],
+      sentences: ['The cubs are fast.', 'I was not in a club.']
+    }
+  };
   var PRAISE = ['YOU SPELLED IT!','WORD MINER!','NICE HUNTING!','SUPER SPELLER!','YOU FOUND IT!','AMAZING!'];
+  var CHAIN_PRAISE = ['NEW WORD!','YOU CHANGED IT!','WORD CHAIN!','NICE SWAP!'];
 
   var canvas = $('#c');
   var renderer;
@@ -509,19 +527,30 @@
   }
   function surfaceCandidates() {
     var list = [];
+    var base = (world.house && world.house.hy != null) ? world.house.hy : 4;
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (var z = 2; z < S - 2; z++) for (var x = 2; x < S - 2; x++) {
       var y = heightAt(x, z);
       if (y <= 0 || y >= H - 2) continue;
+      if (y > base + 2) continue;
       if (world.get(x, y + 1, z)) continue;
       var ground = world.get(x, y, z);
       if (ground === WATER || ground === AIR) continue;
       if (Math.abs(x - world.house.x) < 3 && Math.abs(z - world.house.z) < 4) continue;
+      var walk = false, d;
+      for (d = 0; d < 4; d++) {
+        var ny = heightAt(x + dirs[d][0], z + dirs[d][1]);
+        if (Math.abs(ny - y) <= 1) { walk = true; break; }
+      }
+      if (!walk) continue;
       list.push({ x: x, y: y + 1, z: z, deep: false });
       if (y > 2 && (ground === DIRT || ground === STONE || ground === GRASS)) {
         list.push({ x: x, y: y, z: z, deep: true });
       }
     }
-    return shuffle(list);
+    list = shuffle(list);
+    list.sort(function (a, b) { return a.y - b.y; });
+    return list;
   }
   function placeLetters(word) {
     clearLetters();
@@ -568,6 +597,44 @@
       addLetterMesh(s.x, s.y, s.z, ch);
     }
     rebuildType(GRASS); rebuildType(DIRT); rebuildType(STONE);
+  }
+  function heartMaterial(word) {
+    var c = document.createElement('canvas');
+    c.width = c.height = 64;
+    var g = c.getContext('2d');
+    var x, y;
+    for (y = 0; y < 64; y++) for (x = 0; x < 64; x++) {
+      var n = ((x * 17 + y * 29) & 15) - 8;
+      g.fillStyle = 'rgb(' + (214 + n) + ',' + (64 + n) + ',' + (108 + n) + ')';
+      g.fillRect(x, y, 1, 1);
+    }
+    g.fillStyle = '#fff8f0';
+    g.font = 'bold 26px monospace';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('\u2665', 32, 20);
+    g.font = 'bold 13px monospace';
+    g.fillText(word.toUpperCase(), 32, 46);
+    var tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshLambertMaterial({ map: tex, emissive: 0x661133, emissiveIntensity: 0.75 });
+  }
+  function placeHeart(word) {
+    clearLetters();
+    var spots = surfaceCandidates();
+    var s = null, i;
+    for (i = 0; i < spots.length; i++) {
+      if (!spots[i].deep) { s = spots[i]; break; }
+    }
+    if (!s) s = spots[0];
+    if (!s) return;
+    world.setLetter(s.x, s.y, s.z, '*');
+    var mesh = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.05, 1.05), heartMaterial(word));
+    mesh.position.set(s.x + 0.5, s.y + 0.5, s.z + 0.5);
+    mesh.userData = { x: s.x, y: s.y, z: s.z, ch: '*', heartWord: word };
+    letterGroup.add(mesh);
   }
 
   function buildDecor() {
@@ -678,14 +745,17 @@
   var locked = false;
 
   var G = {
-    score: 0, level: 0, word: '', slots: [], remaining: {}, combo: 0, hintUsed: false
+    score: 0, level: 0, word: '', slots: [], remaining: {}, combo: 0, hintUsed: false,
+    mode: 'spell', swapAt: -1, swapFrom: '', swapTo: '', quests: [], sentence: ''
   };
   var deck = {};
   var customWords = [];
+  var lessonId = localStorage.getItem('lq_lesson') || '39b';
   try {
     var saved = JSON.parse(localStorage.getItem('lq_words') || '[]');
     if (Array.isArray(saved)) customWords = saved;
   } catch (e) { customWords = []; }
+  if (customWords.length) lessonId = '';
   var best = parseInt(localStorage.getItem('lq_best') || '0', 10) || 0;
   var muted = localStorage.getItem('lq_mute') === '1';
   $('#best').textContent = best;
@@ -711,11 +781,42 @@
   function sndWin() { [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.16, 'square', 0.12, i * 0.09); }); }
   function sndClick() { tone(330, 0.05, 'triangle', 0.08); }
   function speak(text) {
-    if (muted || !window.speechSynthesis) return;
+    if (muted) return;
+    var said = String(text || '').trim();
+    if (!said) return;
+    var a = ac();
+    if (a && a.state === 'suspended') a.resume();
+    toast(said.toUpperCase(), 1600);
+    fetch('/api/say?t=' + encodeURIComponent(said)).then(function (r) {
+      if (!r.ok) throw new Error('tts');
+      return r.blob();
+    }).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var audio = new Audio(url);
+      audio.volume = 1;
+      audio.play().catch(function () { speakBrowser(said); });
+      audio.onended = function () { URL.revokeObjectURL(url); };
+    }).catch(function () { speakBrowser(said); });
+  }
+  var speakTimer = null;
+  function speakBrowser(said) {
+    if (!window.speechSynthesis) return;
+    try { window.speechSynthesis.resume(); } catch (e) {}
     window.speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    u.rate = 0.92; u.pitch = 1.08;
-    window.speechSynthesis.speak(u);
+    if (speakTimer) clearTimeout(speakTimer);
+    speakTimer = setTimeout(function () {
+      var u = new SpeechSynthesisUtterance(said);
+      u.rate = 0.85; u.pitch = 1.05; u.volume = 1; u.lang = 'en-US';
+      var voices = window.speechSynthesis.getVoices() || [];
+      for (var i = 0; i < voices.length; i++) {
+        if (/^en/i.test(voices[i].lang)) { u.voice = voices[i]; break; }
+      }
+      try { window.speechSynthesis.resume(); } catch (e2) {}
+      window.speechSynthesis.speak(u);
+    }, 60);
+  }
+  if (window.speechSynthesis) {
+    try { window.speechSynthesis.getVoices(); } catch (e) {}
   }
 
   var fx = $('#fx'), fxctx = fx.getContext('2d');
@@ -766,6 +867,35 @@
     if (!deck[len] || !deck[len].length) deck[len] = shuffle(WORDS[len].slice());
     return deck[len].pop();
   }
+  function firstDiff(a, b) {
+    var n = Math.max(a.length, b.length);
+    for (var i = 0; i < n; i++) {
+      if ((a[i] || '') !== (b[i] || '')) return { i: i, from: a[i] || '', to: b[i] || '' };
+    }
+    return null;
+  }
+  function buildLessonQuests(id) {
+    var L = LESSONS[id];
+    if (!L) return [];
+    var q = [];
+    L.chains.forEach(function (ch, ci) {
+      q.push({ type: 'spell', word: ch.steps[0], tag: 'CHAIN ' + (ci + 1) });
+      for (var i = 1; i < ch.steps.length; i++) {
+        q.push({ type: 'swap', word: ch.steps[i], prev: ch.steps[i - 1], tag: 'CHAIN ' + (ci + 1) });
+      }
+      if (L.hearts[ci]) q.push({ type: 'heart', word: L.hearts[ci] });
+      if (L.sentences[ci]) q.push({ type: 'sentence', text: L.sentences[ci] });
+    });
+    L.hearts.forEach(function (h, i) {
+      if (i >= L.chains.length) q.push({ type: 'heart', word: h });
+    });
+    L.words.forEach(function (w) { q.push({ type: 'spell', word: w, tag: 'SHORT U' }); });
+    return q;
+  }
+  function setSignLabel(text) {
+    var el = document.querySelector('.sign .lbl');
+    if (el) el.textContent = text;
+  }
   function updateHud() {
     $('#score').textContent = G.score;
     $('#level').textContent = G.level;
@@ -776,11 +906,13 @@
     }
     var row = $('#wordRow');
     row.innerHTML = '';
-    G.slots.forEach(function (sl) {
+    G.slots.forEach(function (sl, idx) {
       var i = document.createElement('i');
-      i.textContent = sl.filled ? sl.ch.toUpperCase() : sl.ch.toUpperCase();
+      i.textContent = sl.ch.toUpperCase();
       if (!sl.filled) i.style.opacity = '0.35';
       if (sl.filled) i.className = 'got';
+      if (G.mode === 'swap' && idx === G.swapAt) i.className = sl.filled ? 'got' : 'swap';
+      if (G.mode === 'heart') i.className = sl.filled ? 'got heart' : 'heart';
       row.appendChild(i);
     });
   }
@@ -792,18 +924,90 @@
     toastT = performance.now() + (ms || 1400);
   }
 
-  function startWord() {
-    G.word = nextWord();
-    G.slots = G.word.split('').map(function (ch) { return { ch: ch, filled: false }; });
+  function beginSpell(word, tag) {
+    G.mode = 'spell';
+    G.word = word;
+    G.swapAt = -1;
+    G.slots = word.split('').map(function (ch) { return { ch: ch, filled: false }; });
     G.remaining = {};
-    G.word.split('').forEach(function (ch) { G.remaining[ch] = (G.remaining[ch] || 0) + 1; });
+    word.split('').forEach(function (ch) { G.remaining[ch] = (G.remaining[ch] || 0) + 1; });
     G.combo = 0; G.hintUsed = false; locked = false;
     G.level += 1;
     $('#hintBtn').disabled = false;
-    placeLetters(G.word);
+    placeLetters(word);
+    setSignLabel(tag ? tag + '  —  SPELL' : 'SPELL THIS WORD');
+    $('#hintLine').textContent = 'FIND EVERY LETTER IN  ' + word.toUpperCase();
     updateHud();
-    $('#hintLine').textContent = 'FIND EVERY LETTER IN  ' + G.word.toUpperCase();
-    speak('Find the letters to spell ' + G.word);
+    speak('Find the letters to spell ' + word);
+  }
+  function beginSwap(prev, word, tag) {
+    var d = firstDiff(prev, word);
+    G.mode = 'swap';
+    G.word = word;
+    G.swapFrom = d ? d.from : '';
+    G.swapTo = d ? d.to : '';
+    G.swapAt = d ? d.i : 0;
+    G.slots = word.split('').map(function (ch, idx) {
+      return { ch: ch, filled: idx !== G.swapAt };
+    });
+    G.remaining = {};
+    if (G.swapTo) G.remaining[G.swapTo] = 1;
+    G.combo = 0; G.hintUsed = false; locked = false;
+    G.level += 1;
+    $('#hintBtn').disabled = false;
+    placeLetters(G.swapTo || word);
+    setSignLabel((tag ? tag + '  —  ' : '') + 'CHANGE ' + (G.swapFrom || '?').toUpperCase() + ' TO ' + (G.swapTo || '?').toUpperCase());
+    $('#hintLine').textContent = prev.toUpperCase() + '  →  MINE A  ' + (G.swapTo || '').toUpperCase();
+    updateHud();
+    speak('Change the ' + G.swapFrom + ' to ' + G.swapTo);
+  }
+  function beginHeart(word) {
+    G.mode = 'heart';
+    G.word = word;
+    G.swapAt = -1;
+    G.slots = word.split('').map(function (ch) { return { ch: ch, filled: false }; });
+    G.remaining = { '*': 1 };
+    G.combo = 0; G.hintUsed = false; locked = false;
+    G.level += 1;
+    $('#hintBtn').disabled = false;
+    placeHeart(word);
+    setSignLabel('HEART WORD');
+    $('#hintLine').textContent = 'FIND THE PINK HEART  —  ' + word.toUpperCase();
+    updateHud();
+    speak('Find the heart word ' + word);
+  }
+  function beginSentence(text) {
+    G.mode = 'sentence';
+    G.sentence = text;
+    locked = true;
+    setSignLabel('READ THIS');
+    $('#hintLine').textContent = text.toUpperCase();
+    G.slots = [];
+    updateHud();
+    $('#bannerTitle').textContent = 'READ IT!';
+    $('#bannerSub').textContent = text;
+    $('#banner').style.display = 'flex';
+    speak(text);
+    G.score += 20;
+    updateHud();
+    setTimeout(function () {
+      $('#banner').style.display = 'none';
+      startQuest();
+    }, 3200);
+  }
+  function startQuest() {
+    if (G.quests && G.quests.length) {
+      var q = G.quests.shift();
+      if (q.type === 'swap') beginSwap(q.prev, q.word, q.tag);
+      else if (q.type === 'heart') beginHeart(q.word);
+      else if (q.type === 'sentence') beginSentence(q.text);
+      else beginSpell(q.word, q.tag);
+      return;
+    }
+    startWord();
+  }
+  function startWord() {
+    beginSpell(nextWord(), '');
   }
 
   function spawnPlayer() {
@@ -834,7 +1038,8 @@
     });
     spawnPlayer();
     G.score = 0; G.level = 0; deck = {};
-    startWord();
+    G.quests = (lessonId && LESSONS[lessonId] && !customWords.length) ? buildLessonQuests(lessonId) : [];
+    startQuest();
     running = true;
     $('#hud').classList.add('live');
   }
@@ -882,7 +1087,7 @@
     return null;
   }
 
-  var REACH = 3.2;
+  var REACH = 4.5;
   function letterDist2(m) {
     var dx = m.position.x - player.x;
     var dy = m.position.y - (player.y + 0.8);
@@ -962,6 +1167,18 @@
   }
 
   function collectLetter(ch, sx, sy) {
+    if (G.mode === 'heart' && (ch === '*' || ch === G.word[0])) {
+      G.slots.forEach(function (sl) { sl.filled = true; });
+      G.remaining = {};
+      G.score += 40;
+      burst(sx, sy, ['#ff6b9d', '#ffe566', '#fff'], 22, 3.8);
+      sndGood(3);
+      toast('HEART WORD  ' + G.word.toUpperCase() + '!', 1200);
+      speak(G.word);
+      updateHud();
+      winWord();
+      return;
+    }
     if ((G.remaining[ch] || 0) > 0) {
       for (var k = 0; k < G.slots.length; k++) {
         if (G.slots[k].ch === ch && !G.slots[k].filled) { G.slots[k].filled = true; break; }
@@ -980,23 +1197,34 @@
       G.combo = 0;
       burst(sx, sy, ['#999', '#555'], 10, 2.4);
       sndBad();
-      toast('NOT IN THIS WORD', 900);
+      if (G.mode === 'swap' && G.swapTo) toast('NEED  ' + G.swapTo.toUpperCase(), 900);
+      else toast('NOT IN THIS WORD', 900);
     }
   }
 
   function winWord() {
     locked = true;
-    G.score += 50;
+    G.score += G.mode === 'swap' ? 35 : 50;
     updateHud();
     sndWin();
     confetti();
-    $('#bannerTitle').textContent = PRAISE[rand(PRAISE.length)];
-    $('#bannerSub').textContent = G.word.toUpperCase() + '   +50';
+    if (G.mode === 'swap') {
+      $('#bannerTitle').textContent = CHAIN_PRAISE[rand(CHAIN_PRAISE.length)];
+      $('#bannerSub').textContent = G.word.toUpperCase() + '   READ IT!';
+      speak(G.word);
+    } else if (G.mode === 'heart') {
+      $('#bannerTitle').textContent = 'HEART WORD!';
+      $('#bannerSub').textContent = G.word.toUpperCase();
+      speak(G.word);
+    } else {
+      $('#bannerTitle').textContent = PRAISE[rand(PRAISE.length)];
+      $('#bannerSub').textContent = G.word.toUpperCase() + '   +50';
+      speak('You spelled ' + G.word + '!');
+    }
     $('#banner').style.display = 'flex';
-    speak('You spelled ' + G.word + '!');
     setTimeout(function () {
       $('#banner').style.display = 'none';
-      startWord();
+      startQuest();
     }, 2200);
   }
 
@@ -1019,7 +1247,8 @@
     for (var i = 0; i < letterGroup.children.length; i++) {
       var m = letterGroup.children[i];
       var ch = m.userData.ch;
-      if (!(G.remaining[ch] > 0)) continue;
+      var wanted = (G.remaining[ch] || 0) > 0 || (G.mode === 'heart' && m.userData.heartWord);
+      if (!wanted) continue;
       var dx = m.position.x - player.x, dz = m.position.z - player.z;
       var d = dx * dx + dz * dz;
       if (d < bestD) { bestD = d; bestP = m; }
@@ -1122,7 +1351,8 @@
   $('#muteBtn').addEventListener('click', function () { muted = !muted; refreshMute(); if (!muted) sndClick(); });
   $('#sayBtn').addEventListener('click', function () {
     sndClick();
-    if (G.word) speak(G.word.split('').join(' ') + '. ' + G.word);
+    if (G.mode === 'sentence' && G.sentence) speak(G.sentence);
+    else if (G.word) speak(G.word.split('').join(' ') + '. ' + G.word);
   });
   $('#hintBtn').addEventListener('click', function () {
     if (!running || locked || G.hintUsed) return;
@@ -1130,16 +1360,28 @@
     var n = nearestNeeded();
     if (n) {
       n.userData.hint = 2.8;
-      toast('A NEEDED LETTER IS GLOWING!', 1600);
-      speak('Look for the glowing ' + n.userData.ch);
+      if (n.userData.heartWord) {
+        toast('THE PINK HEART IS GLOWING!', 1600);
+        speak('Look for the pink heart');
+      } else {
+        toast('A NEEDED LETTER IS GLOWING!', 1600);
+        speak('Look for the glowing ' + n.userData.ch);
+      }
     }
   });
   $('#resetBtn').addEventListener('click', function () { sndClick(); newGame(); });
-  $('#playBtn').addEventListener('click', function () {
+  function startFromTitle() {
     sndClick();
     if (ac() && actx.state === 'suspended') actx.resume();
     $('#overlay').style.display = 'none';
     newGame();
+  }
+  $('#playBtn').addEventListener('click', startFromTitle);
+  $('#lessonPlay').addEventListener('click', function () {
+    lessonId = '39b';
+    localStorage.setItem('lq_lesson', '39b');
+    saveWordsLocal([]);
+    startFromTitle();
   });
   function refreshWordsUI() {
     var n = customWords.length;
@@ -1148,7 +1390,11 @@
     var box = $('#wordsBox');
     if (box && !box.value.trim() && n) box.value = customWords.join('\n');
     var st = $('#wordsStatus');
-    if (st) st.textContent = n ? (n + ' words ready') : 'Using built-in 1st grade words';
+    if (st) {
+      if (lessonId && LESSONS[lessonId] && !n) st.textContent = 'Lesson 39b — short u, chains, heart words';
+      else st.textContent = n ? (n + ' words ready') : 'Using built-in 1st grade words';
+    }
+    if (note && lessonId && !n) note.textContent = 'LESSON 39B  SHORT U';
   }
   function saveWordsLocal(list) {
     customWords = list || [];
@@ -1166,6 +1412,7 @@
     return fetch('/api/words').then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
       if (data && data.words && data.words.length) {
         saveWordsLocal(data.words);
+        lessonId = '';
         deck = {};
         refreshWordsUI();
       }
@@ -1185,28 +1432,47 @@
       return;
     }
     saveWordsLocal(list);
+    lessonId = '';
+    localStorage.removeItem('lq_lesson');
     deck = {};
+    G.quests = [];
     refreshWordsUI();
     sndClick();
-    if (running) startWord();
+    if (running) startQuest();
     toast(list.length + ' WORDS LOADED', 1400);
     pushWordsToServer(list);
   }
   function clearWords() {
     saveWordsLocal([]);
+    lessonId = '';
+    localStorage.removeItem('lq_lesson');
     $('#wordsBox').value = '';
     deck = {};
+    G.quests = [];
     refreshWordsUI();
     sndClick();
-    if (running) startWord();
+    if (running) startQuest();
     toast('BACK TO BUILT-IN WORDS', 1200);
     fetch('/api/words', { method: 'DELETE' }).catch(function () {});
+  }
+  function useLesson39b() {
+    lessonId = '39b';
+    localStorage.setItem('lq_lesson', '39b');
+    saveWordsLocal([]);
+    deck = {};
+    G.quests = buildLessonQuests('39b');
+    refreshWordsUI();
+    sndClick();
+    closeWords();
+    toast('LESSON 39B  SHORT U', 1400);
+    if (running) startQuest();
   }
   $('#wordsBtn').addEventListener('click', function (e) { e.stopPropagation(); sndClick(); openWords(); });
   $('#wordsBtn2').addEventListener('click', function (e) { e.stopPropagation(); sndClick(); openWords(); });
   $('#wordsUse').addEventListener('click', applyWords);
   $('#wordsClear').addEventListener('click', clearWords);
   $('#wordsClose').addEventListener('click', closeWords);
+  $('#lessonBtn').addEventListener('click', useLesson39b);
   refreshMute();
   refreshWordsUI();
   pullWordsFromServer();
@@ -1267,8 +1533,10 @@
       var tz = player.z + wishZ * speed * dt;
       if (!collide(tx, player.y, player.z)) player.x = tx;
       else if (!collide(tx, player.y + 1.02, player.z)) { player.y += 1; player.x = tx; }
+      else if (!collide(tx, player.y + 2.02, player.z)) { player.y += 2; player.x = tx; }
       if (!collide(player.x, player.y, tz)) player.z = tz;
       else if (!collide(player.x, player.y + 1.02, tz)) { player.y += 1; player.z = tz; }
+      else if (!collide(player.x, player.y + 2.02, tz)) { player.y += 2; player.z = tz; }
       player.yaw = Math.atan2(wishX, wishZ);
       walkPhase += dt * 10;
     } else {
@@ -1276,7 +1544,7 @@
     }
 
     if ((jumpHeld || keys.Space) && player.onGround) {
-      player.vy = 7.2;
+      player.vy = 9.8;
       player.onGround = false;
       tone(520, 0.06, 'square', 0.06);
     }

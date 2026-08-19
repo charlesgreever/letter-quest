@@ -5,7 +5,8 @@ WORKDIR /app
 COPY server.py /app/server.py
 COPY public /app/public
 
-RUN mkdir -p /data && chmod 777 /data
+RUN apk add --no-cache espeak-ng \
+    && mkdir -p /data && chmod 777 /data
 
 ENV PORT=8080 \
     DATA_DIR=/data \
