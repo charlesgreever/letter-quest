@@ -112,6 +112,22 @@ class WriteGateTests(unittest.TestCase):
         self.assertFalse(self.srv.can_write("127.0.0.1", pin="secret", provided=None))
 
 
+class VoiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.srv = _load_server(Path(self.tmp.name))
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_known_voice_maps_to_an_espeak_name(self) -> None:
+        self.assertEqual(self.srv.resolve_voice("annie"), "en-us+Annie")
+
+    def test_unknown_or_nasty_voice_falls_back_to_teacher(self) -> None:
+        self.assertEqual(self.srv.resolve_voice("hax;rm -rf"), self.srv.resolve_voice("teacher"))
+        self.assertEqual(self.srv.resolve_voice(None), self.srv.resolve_voice("teacher"))
+
+
 class ApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -148,6 +164,13 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(body["ok"])
         self.assertIn("tts", body)
+
+    def test_voices_list_includes_teacher_and_annie(self) -> None:
+        code, body = self._json("GET", "/api/voices")
+        self.assertEqual(code, 200)
+        ids = [v["id"] for v in body["voices"]]
+        self.assertIn("teacher", ids)
+        self.assertIn("annie", ids)
 
     def test_post_lesson_then_get_catalog_includes_it(self) -> None:
         code, body = self._json(

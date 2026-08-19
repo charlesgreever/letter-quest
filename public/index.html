@@ -137,6 +137,7 @@
     <button class="btn hit" id="sayBtn">SAY IT</button>
     <button class="btn hit" id="hintBtn">HINT</button>
     <button class="btn hit" id="muteBtn">SOUND</button>
+    <button class="btn hit" id="voiceBtn">TEACHER</button>
     <button class="btn hit" id="wordsBtn">LESSONS</button>
     <button class="btn hit" id="resetBtn">NEW</button>
   </div>
@@ -790,6 +791,15 @@
   if (customWords.length) lessonId = '';
   var best = parseInt(localStorage.getItem('lq_best') || '0', 10) || 0;
   var muted = localStorage.getItem('lq_mute') === '1';
+  var voices = [
+    { id: 'teacher', label: 'Teacher' },
+    { id: 'annie', label: 'Annie' },
+    { id: 'alicia', label: 'Alicia' },
+    { id: 'andrea', label: 'Andrea' },
+    { id: 'andy', label: 'Andy' },
+    { id: 'david', label: 'David' }
+  ];
+  var voiceId = localStorage.getItem('lq_voice') || 'teacher';
   $('#best').textContent = best;
 
   var actx = null;
@@ -819,7 +829,7 @@
     var a = ac();
     if (a && a.state === 'suspended') a.resume();
     toast(said.toUpperCase(), 1600);
-    fetch('/api/say?t=' + encodeURIComponent(said)).then(function (r) {
+    fetch('/api/say?t=' + encodeURIComponent(said) + '&v=' + encodeURIComponent(voiceId)).then(function (r) {
       if (!r.ok) throw new Error('tts');
       return r.blob();
     }).then(function (blob) {
@@ -1423,7 +1433,26 @@
     $('#muteBtn').textContent = muted ? 'MUTED' : 'SOUND';
     localStorage.setItem('lq_mute', muted ? '1' : '0');
   }
+  function voiceIndex() {
+    for (var i = 0; i < voices.length; i++) if (voices[i].id === voiceId) return i;
+    return 0;
+  }
+  function refreshVoice() {
+    if (!voices.length) return;
+    if (voiceIndex() === 0 && voiceId !== voices[0].id) voiceId = voices[0].id;
+    var v = voices[voiceIndex()];
+    voiceId = v.id;
+    var btn = $('#voiceBtn');
+    if (btn) btn.textContent = v.label.toUpperCase();
+    localStorage.setItem('lq_voice', voiceId);
+  }
   $('#muteBtn').addEventListener('click', function () { muted = !muted; refreshMute(); if (!muted) sndClick(); });
+  $('#voiceBtn').addEventListener('click', function () {
+    sndClick();
+    voiceId = voices[(voiceIndex() + 1) % voices.length].id;
+    refreshVoice();
+    speak(voices[voiceIndex()].label);
+  });
   $('#sayBtn').addEventListener('click', function () {
     sndClick();
     if (G.mode === 'sentence' && G.sentence) speak(G.sentence);
@@ -1684,6 +1713,7 @@
   $('#lessonBtn').addEventListener('click', function () { useLesson(lessonId); });
   $('#addSave').addEventListener('click', saveNewLesson);
   refreshMute();
+  refreshVoice();
   refreshWordsUI();
   loadCatalog().then(function () { pullWordsFromServer(); });
 

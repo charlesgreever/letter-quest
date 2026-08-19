@@ -28,6 +28,24 @@ SAY_SAFE = re.compile(r"[^A-Za-z0-9 .,!?'\-]")
 ESPEAK = shutil.which("espeak-ng") or shutil.which("espeak")
 BODY_LIMIT = 65536
 PIN = os.environ.get("LETTER_QUEST_PIN", "").strip()
+VOICES = {
+    "teacher": {"id": "teacher", "label": "Teacher", "espeak": "en+f3"},
+    "annie": {"id": "annie", "label": "Annie", "espeak": "en-us+Annie"},
+    "alicia": {"id": "alicia", "label": "Alicia", "espeak": "en-us+Alicia"},
+    "andrea": {"id": "andrea", "label": "Andrea", "espeak": "en-us+Andrea"},
+    "andy": {"id": "andy", "label": "Andy", "espeak": "en-us+Andy"},
+    "david": {"id": "david", "label": "David", "espeak": "en-us+David"},
+}
+VOICE_ORDER = ["teacher", "annie", "alicia", "andrea", "andy", "david"]
+
+
+def resolve_voice(name: str | None) -> str:
+    key = re.sub(r"[^a-z0-9]", "", (name or "").lower())
+    return VOICES.get(key, VOICES["teacher"])["espeak"]
+
+
+def list_voices() -> list[dict]:
+    return [{"id": VOICES[k]["id"], "label": VOICES[k]["label"]} for k in VOICE_ORDER]
 
 
 class DataError(Exception):
@@ -58,7 +76,7 @@ def _is_lan(ip: str) -> bool:
     return a == 127 or a == 10 or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31)
 
 
-def speak_wav(text: str) -> bytes | None:
+def speak_wav(text: str, voice: str | None = None) -> bytes | None:
     if not ESPEAK:
         return None
     cleaned = SAY_SAFE.sub("", text or "").strip()[:180]
@@ -68,7 +86,7 @@ def speak_wav(text: str) -> bytes | None:
     os.close(fd)
     try:
         proc = subprocess.run(
-            [ESPEAK, "-w", path, "-s", "120", "-a", "180", "-ven+f3", cleaned],
+            [ESPEAK, "-w", path, "-s", "120", "-a", "180", "-v", resolve_voice(voice), cleaned],
             capture_output=True,
             timeout=8,
             check=False,
@@ -285,13 +303,17 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/lessons":
                 self._json(200, load_catalog())
                 return
+            if path == "/api/voices":
+                self._json(200, {"voices": list_voices()})
+                return
         except DataError as exc:
             self._json(500, {"ok": False, "error": str(exc)})
             return
         if path == "/api/say":
             qs = parse_qs(urlparse(self.path).query)
             raw = (qs.get("t") or qs.get("text") or [""])[0]
-            wav = speak_wav(raw)
+            voice = (qs.get("v") or qs.get("voice") or [""])[0]
+            wav = speak_wav(raw, voice)
             if not wav:
                 self.send_error(503, "tts unavailable")
                 return
