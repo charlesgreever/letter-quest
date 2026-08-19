@@ -1147,27 +1147,6 @@
   function hitFromLetter(m) {
     return { x: m.userData.x, y: m.userData.y, z: m.userData.z, fromLetter: true };
   }
-  function ndcFromEvent(e) {
-    var r = canvas.getBoundingClientRect();
-    return {
-      x: ((e.clientX - r.left) / Math.max(1, r.width)) * 2 - 1,
-      y: -((e.clientY - r.top) / Math.max(1, r.height)) * 2 + 1
-    };
-  }
-  function pickLetterAt(clientX, clientY) {
-    var r = canvas.getBoundingClientRect();
-    var ndc = new THREE.Vector2(
-      ((clientX - r.left) / Math.max(1, r.width)) * 2 - 1,
-      -((clientY - r.top) / Math.max(1, r.height)) * 2 + 1
-    );
-    var rc = new THREE.Raycaster();
-    rc.setFromCamera(ndc, camera);
-    var hits = rc.intersectObjects(letterGroup.children, false);
-    if (!hits.length) return null;
-    var m = hits[0].object;
-    if (letterDist2(m) > 4.5 * 4.5) return null;
-    return hitFromLetter(m);
-  }
   function pickMineTarget() {
     var near = nearestLetterInReach(REACH);
     if (near) return hitFromLetter(near);
@@ -1176,11 +1155,6 @@
     return voxelMarch(player.x, player.y + 1.15, player.z, lx / len, ly / len, lz / len, 5);
   }
 
-  function rayFromCamera(nx, ny) {
-    var v = new THREE.Vector3(nx, ny, 0.5).unproject(camera);
-    var dir = v.sub(camera.position).normalize();
-    return voxelMarch(camera.position.x, camera.position.y, camera.position.z, dir.x, dir.y, dir.z, 9);
-  }
   function inRange(bx, by, bz) {
     var dx = bx + 0.5 - player.x, dy = by + 0.5 - (player.y + 0.9), dz = bz + 0.5 - player.z;
     return dx * dx + dy * dy + dz * dz <= 5.8 * 5.8;
@@ -1409,18 +1383,6 @@
   });
   window.addEventListener('pointerup', function (e) {
     if (e.pointerId !== lookPtr.id) return;
-    if (running && !locked) {
-      var letterHit = pickLetterAt(e.clientX, e.clientY);
-      if (letterHit && (!lookPtr.moved || lookPtr.dist < 40)) doMineHit(letterHit);
-      else if (!lookPtr.moved) {
-        var near = nearestLetterInReach(2.5);
-        if (near) doMineHit(hitFromLetter(near));
-        else {
-          var ndc = ndcFromEvent(e);
-          doMineHit(rayFromCamera(ndc.x, ndc.y));
-        }
-      }
-    }
     lookPtr.id = null;
   });
 
